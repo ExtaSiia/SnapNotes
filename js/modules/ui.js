@@ -34,6 +34,17 @@ export function closeModal() {
         const body = document.getElementById('modal-body');
         if (body) body.innerHTML = '';
         currentModalConfirmAction = null;
+
+        // Reset button styles
+        const confirmBtn = document.getElementById('modal-confirm-btn');
+        if (confirmBtn) {
+            confirmBtn.className = 'btn-primary';
+            confirmBtn.style = '';
+            confirmBtn.innerText = 'Confirmer';
+        }
+        const cancelBtn = document.querySelector('#modal-footer .btn-secondary');
+        if (cancelBtn) cancelBtn.innerText = 'Annuler';
+
     }, 300);
 }
 
@@ -228,15 +239,21 @@ export function createCardDOM(shortcut, isNew = false) {
     deleteBtn.className = 'deleteBtn';
     deleteBtn.innerHTML = '<span class="material-symbols-rounded">delete</span> Supprimer';
     deleteBtn.onclick = () => {
-        if (confirm('Supprimer ce raccourci ?')) {
-            card.style.transform = 'scale(0.8)';
-            card.style.opacity = '0';
-            setTimeout(async () => {
-                card.remove();
-                await handlers.onSave();
-                showToast('Supprimé', 'info');
-            }, 300);
-        }
+        showConfirmModal({
+            title: 'Supprimer le raccourci ?',
+            message: 'Voulez-vous vraiment supprimer ce raccourci ?\nCette action est irréversible.',
+            isDanger: true,
+            confirmText: 'Supprimer',
+            onConfirm: async () => {
+                card.style.transform = 'scale(0.8)';
+                card.style.opacity = '0';
+                setTimeout(async () => {
+                    card.remove();
+                    await handlers.onSave();
+                    showToast('Supprimé', 'info');
+                }, 300);
+            }
+        });
     };
 
     btnContainer.appendChild(copyBtn);
@@ -247,6 +264,43 @@ export function createCardDOM(shortcut, isNew = false) {
     addDnDHandlers(card);
 
     if (isNew) setTimeout(() => card.classList.remove('new'), 500);
+}
+
+export function showConfirmModal({ title, message, onConfirm, isDanger = false, confirmText = 'Confirmer', cancelText = 'Annuler' }) {
+    const modalBody = document.getElementById('modal-body');
+    document.getElementById('modal-title').innerText = title;
+
+    // Simple text message
+    modalBody.innerHTML = `<p style="margin-bottom: 0;">${message.replace(/\n/g, '<br>')}</p>`;
+
+    const confirmBtn = document.getElementById('modal-confirm-btn');
+    const cancelBtn = document.querySelector('#modal-footer .btn-secondary');
+
+    // Update Text
+    if (confirmBtn) confirmBtn.innerText = confirmText;
+    if (cancelBtn) cancelBtn.innerText = cancelText;
+
+    // Style Danger
+    if (isDanger) {
+        confirmBtn.className = 'btn-primary deleteBtn'; // Re-use delete styling or add specific danger class
+        confirmBtn.style.backgroundColor = 'var(--delete-color)';
+        confirmBtn.style.color = '#fff';
+        confirmBtn.style.boxShadow = '0 4px 14px rgba(231, 76, 60, 0.3)';
+    } else {
+        // Reset to default primary
+        confirmBtn.className = 'btn-primary';
+        confirmBtn.style = ''; // Clear inline styles
+    }
+
+    document.getElementById('modal-overlay').classList.remove('hidden');
+
+    currentModalConfirmAction = async () => {
+        if (onConfirm) await onConfirm();
+        // Reset button style after close is handled by closeModal usually, 
+        // but we should arguably reset it when opening next time.
+        // For safety, let's reset style on next open or close?
+        // Let's reset it in closeModal.
+    };
 }
 
 

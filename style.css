@@ -1329,6 +1329,12 @@ body.light .action-btn:hover {
         bottom: 20px;
         right: 20px;
     }
+
+    .security-modal {
+        padding: 25px 20px;
+        /* Reduced padding for mobile */
+        width: 85%;
+    }
 }
 
 /* Footer */
@@ -1367,6 +1373,8 @@ footer a:hover {
     transition: all 0.3s ease;
     outline: none;
     box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
+    /* Fix width overflow */
 }
 
 #security-input::placeholder {

@@ -124,6 +124,43 @@ function setupSecurity() {
     btn.onclick = handleUnlock;
     input.onkeydown = (e) => { if (e.key === 'Enter') handleUnlock(); };
 
+    // Forgot Password
+    const forgotBtn = document.getElementById('forgot-password');
+    if (forgotBtn) {
+        forgotBtn.onclick = () => {
+            UI.showConfirmModal({
+                title: 'Réinitialisation',
+                message: 'ATTENTION : Cela va SUPPRIMER TOUTES VOS NOTES pour réinitialiser l\'application.\n\nÊtes-vous sûr de vouloir tout effacer ?',
+                isDanger: true,
+                confirmText: 'Tout effacer',
+                onConfirm: () => {
+                    // Close first modal is handled, need to wait a bit or direct open second?
+                    // closeModal has 300ms timeout.
+                    // Let's chain it.
+                    setTimeout(() => {
+                        UI.showConfirmModal({
+                            title: 'Irréversible !',
+                            message: 'Dernière confirmation : Cette action est IRRÉVERSIBLE.\n\nVos données seront perdues à jamais. Continuer ?',
+                            isDanger: true,
+                            confirmText: 'OUI, tout supprimer',
+                            onConfirm: async () => {
+                                try {
+                                    await DB.clearShortcuts();
+                                    localStorage.removeItem('snapnotes_salt');
+                                    sessionStorage.clear();
+                                    window.location.reload();
+                                } catch (e) {
+                                    console.error(e);
+                                    UI.showToast('Erreur lors de la réinitialisation', 'error');
+                                }
+                            }
+                        });
+                    }, 350); // Wait for close animation
+                }
+            });
+        };
+    }
+
     // Check existing session
     Crypto.restoreSession().then(hasSession => {
         if (hasSession) {
