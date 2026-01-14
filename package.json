@@ -4,7 +4,7 @@
     "description": "Secure, fast, and offline-ready note taking app.",
     "main": "app.js",
     "scripts": {
-        "start": "npx live-server . --port=8080 --entry-file=raccourcis.html"
+        "start": "npx live-server . --port=8080 --entry-file=index.html"
     },
     "keywords": [
         "pwa",

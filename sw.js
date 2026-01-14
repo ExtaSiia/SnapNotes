@@ -1,6 +1,6 @@
-const CACHE_NAME = 'raccourcis-v2.2';
+const CACHE_NAME = 'raccourcis-v2.3';
 const ASSETS = [
-    './raccourcis.html',
+    './index.html',
     './style.css',
     './app.js',
     './manifest.json',
