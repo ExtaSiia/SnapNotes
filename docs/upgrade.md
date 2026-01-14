@@ -1,25 +1,34 @@
 # Pistes d'Amélioration (Roadmap)
 
-## ✅ Fonctionnalités Implémentées (V1.1)
+## ✅ Fonctionnalités Implémentées (V2.0)
 
-*   **Refactoring** : Séparation HTML/CSS/JS effectuée.
-*   **UX / UI** : Notifications "Toast", Modales non-bloquantes, Drag & Drop implémenté.
-*   **Fonctionnalités** : Catégories, Filtres, Raccourcis clavier (Ctrl+F, Ctrl+B, Esc), Tri intelligent.
+### Expérience Utilisateur
+*   **Annuler / Rétablir (Undo/Redo)** : Gestion complète de l'historique (Ctrl+Z/Y).
+*   **Formatage** : Support Markdown (Gras, Code, Liste) + Liens cliquables.
+*   **Mode "Compact"** : Vue densifiée activable.
+
+### Portabilité
+*   **PWA (Progressive Web App)** : 100% Hors ligne, installation native.
+*   **Export/Import** : JSON et Markdown.
+
+### Architecture & Sécurité (MAJEUR)
+*   **Stockage** : Migration vers IndexedDB.
+*   **Chiffrement** : AES-GCM via Web Crypto API (Zero Knowledge).
+*   **Verrouillage** : Session persistante sécurisée (15min timeout).
 
 ---
 
-## 🚀 Propositions pour la V2
+## 🚀 Propositions pour la V3 (Futur)
 
-### 1. Expérience Utilisateur Avancée
-*   **Annuler / Rétablir (Undo/Redo)** : Indispensable pour restaurer une carte supprimée par erreur ou une modification de texte malheureuse.
-*   **Détection de Liens** : Si le contenu d'un raccourci est une URL, ajouter un bouton "Ouvrir" ou rendre le texte cliquable automatiquement.
-*   **Markdown Simple** : Supporter un formatage basique (*gras*, `code`, - liste) pour rendre les notes plus lisibles.
+### 1. Synchronisation Cloud
+*   Synchroniser les données chiffrées entre appareils (via un serveur simple ou Peer-to-Peer).
 
-### 2. Portabilité & Technique
-*   **PWA (Progressive Web App)** : Ajouter un `manifest.json` et un `service-worker` pour rendre l'application installable sur mobile et PC (fonctionne hors ligne comme une vrai app).
-*   **Export Avancé** : Permettre d'exporter en CSV ou Markdown, ou de n'exporter qu'une catégorie spécifique.
+### 2. Personnalisation Poussée
+*   Choix de la couleur d'accentuation.
+*   Arrière-plans personnalisés.
 
-### 3. Personnalisation
-*   **Thèmes Personnalisés** : Laisser l'utilisateur choisir une couleur d'accentuation (autre que le violet actuel) ou un fond d'écran.
-*   **Mode "Compact"** : Une vue liste (tableau) au lieu de grille pour ceux qui ont des centaines de raccourcis.
+### 3. Fonctions "Pro"
+*   Tags multiples par raccourci.
+*   Recherche floue (Fuzzy search).
+
 

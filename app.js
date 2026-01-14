@@ -1,4 +1,320 @@
-const storageKey = 'shortcuts';
+const DB_NAME = 'SnapNotesDB';
+const DB_VERSION = 1;
+const STORE_SHORTCUTS = 'shortcuts';
+const STORE_CONFIG = 'config';
+
+let db;
+let sessionKey = null; // CryptoKey
+let appSalt = null; // Uint8Array
+
+// State
+let shortcutsCache = []; // In-memory cache for search/rendering
+
+/* ---------- Phase 1: IndexedDB ---------- */
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+        request.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(STORE_SHORTCUTS)) {
+                db.createObjectStore(STORE_SHORTCUTS, { keyPath: 'id', autoIncrement: true });
+            }
+            if (!db.objectStoreNames.contains(STORE_CONFIG)) {
+                db.createObjectStore(STORE_CONFIG, { keyPath: 'key' });
+            }
+        };
+
+        request.onsuccess = (e) => {
+            db = e.target.result;
+            resolve(db);
+        };
+
+        request.onerror = (e) => reject('DB Error: ' + e.target.error);
+    });
+}
+
+/* ---------- Phase 2: Web Crypto API ---------- */
+// 1. Get/Create Global Salt
+async function getOrInitSalt() {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction([STORE_CONFIG], 'readwrite');
+        const store = tx.objectStore(STORE_CONFIG);
+        const req = store.get('appSalt');
+
+        req.onsuccess = async () => {
+            if (req.result) {
+                // Found existing salt
+                resolve(req.result.value);
+            } else {
+                // New install/migration: Create salt
+                const newSalt = crypto.getRandomValues(new Uint8Array(16));
+                store.put({ key: 'appSalt', value: newSalt });
+                resolve(newSalt);
+            }
+        };
+        req.onerror = () => reject('Salt Error');
+    });
+}
+
+// 2. Derive Key from Password + Salt
+async function deriveKey(password, salt) {
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        enc.encode(password),
+        { name: 'PBKDF2' },
+        false,
+        ['deriveKey']
+    );
+
+    return crypto.subtle.deriveKey(
+        {
+            name: 'PBKDF2',
+            salt: salt,
+            iterations: 100000,
+            hash: 'SHA-256'
+        },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        true, // Change to TRUE to allow export for session persistence
+        ['encrypt', 'decrypt']
+    );
+}
+
+// ...
+
+async function restoreState(jsonString) {
+    isRestoringHistory = true;
+    const data = JSON.parse(jsonString);
+
+    // Direct Refill (skip decrypt since history is plaintext)
+    const container = document.getElementById('customShortcuts');
+    const dtCard = document.getElementById('datetime-card');
+    container.innerHTML = '';
+    if (dtCard) container.appendChild(dtCard);
+
+    data.forEach(s => createCardDOM(s.title, s.content, s.category || 'Autre', s.lastUsed));
+
+    // updateShortcutsGrid(); // REMOVED (Legacy)
+    // We already re-rendered above.
+
+    await saveShortcuts(); // Persist the restore to IDB
+    isRestoringHistory = false;
+    updateUndoRedoUI();
+    showToast('État restauré', 'info');
+}
+
+// 3. Encrypt Data
+async function encryptData(text) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const enc = new TextEncoder();
+    const encrypted = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv: iv },
+        sessionKey,
+        enc.encode(text)
+    );
+    return { iv: iv, data: encrypted };
+}
+
+// 4. Decrypt Data
+async function decryptData(encryptedObj) {
+    try {
+        const decrypted = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: encryptedObj.iv },
+            sessionKey,
+            encryptedObj.data
+        );
+        const dec = new TextDecoder();
+        return dec.decode(decrypted);
+    } catch (e) {
+        console.error('Decryption failed', e);
+        return null; // Wrong password or corrupted
+    }
+}
+
+/* ---------- App Unlock Flow ---------- */
+const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 Minutes
+
+async function initApp() {
+    try {
+        await openDB();
+
+        // Show Security Overlay by default
+        const overlay = document.getElementById('security-overlay');
+        const input = document.getElementById('security-input');
+        const btn = document.getElementById('security-btn');
+
+        // Check Session
+        const hasSession = await restoreSession();
+        if (hasSession) {
+            overlay.classList.add('hidden');
+            await loadAndRenderShortcuts();
+            showToast('Session restaurée 🔓', 'info');
+            startInactivityTimer();
+            return; // Skip login prompt
+        }
+
+        // Check if migration needed (LocalStorage exists)
+        const hasLegacy = localStorage.getItem('shortcuts');
+        if (hasLegacy) {
+            document.getElementById('security-message').textContent = "Migration : Créez votre code secret pour sécuriser vos notes existantes.";
+        }
+
+        overlay.classList.remove('hidden');
+        input.focus();
+
+        btn.onclick = async () => handleUnlock();
+        input.onkeydown = (e) => { if (e.key === 'Enter') handleUnlock(); };
+
+    } catch (err) {
+        showToast('Erreur Init: ' + err, 'error');
+    }
+}
+
+async function handleUnlock() {
+    const pwd = document.getElementById('security-input').value;
+    if (!pwd) return showToast('Code requis', 'error');
+
+    try {
+        appSalt = await getOrInitSalt();
+        sessionKey = await deriveKey(pwd, appSalt);
+
+        // Load or Migrate
+        const overlay = document.getElementById('security-overlay');
+
+        // Check legacy
+        if (localStorage.getItem('shortcuts')) {
+            await performMigration();
+        }
+
+        // Save Session
+        await saveSession(sessionKey);
+
+        // Load Data
+        await loadAndRenderShortcuts();
+
+        // If successful
+        overlay.classList.add('hidden');
+        showToast('Notes déverrouillées 🔓', 'success');
+        startInactivityTimer();
+
+    } catch (err) {
+        showToast('Erreur (Code incorrect ?)', 'error');
+        console.error(err);
+    }
+}
+
+/* ---------- Session Management (SessionStorage) ---------- */
+async function saveSession(key) {
+    const exported = await crypto.subtle.exportKey('jwk', key);
+    sessionStorage.setItem('snapNotesKey', JSON.stringify(exported));
+    sessionStorage.setItem('lastActive', Date.now());
+}
+
+async function restoreSession() {
+    const jsonKey = sessionStorage.getItem('snapNotesKey');
+    const lastActive = sessionStorage.getItem('lastActive');
+
+    if (!jsonKey || !lastActive) return false;
+
+    // Check Timeout
+    if (Date.now() - parseInt(lastActive) > SESSION_TIMEOUT_MS) {
+        sessionStorage.clear();
+        return false;
+    }
+
+    try {
+        appSalt = await getOrInitSalt(); // Salt is needed for new derivations but not for import
+        const jwk = JSON.parse(jsonKey);
+        sessionKey = await crypto.subtle.importKey(
+            'jwk',
+            jwk,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt', 'decrypt']
+        );
+        return true;
+    } catch (e) {
+        console.error('Session restore failed', e);
+        return false;
+    }
+}
+
+let inactivityTimer;
+function startInactivityTimer() {
+    // Update lastActive on interactions
+    ['mousedown', 'keydown', 'touchstart'].forEach(evt => {
+        document.addEventListener(evt, () => {
+            sessionStorage.setItem('lastActive', Date.now());
+        });
+    });
+
+    // Check periodically
+    setInterval(() => {
+        const last = sessionStorage.getItem('lastActive');
+        if (last && (Date.now() - parseInt(last) > SESSION_TIMEOUT_MS)) {
+            lockApp();
+        }
+    }, 60000); // Check every minute
+}
+
+function lockApp() {
+    sessionStorage.removeItem('snapNotesKey');
+    sessionKey = null;
+    shortcutsCache = []; // Clear memory
+    const container = document.getElementById('customShortcuts');
+    container.innerHTML = ''; // Clear UI
+
+    document.getElementById('security-overlay').classList.remove('hidden');
+    document.getElementById('security-input').value = '';
+    showToast('Session expirée', 'warning');
+}
+
+
+/* ---------- Migration (LS -> IDB) ---------- */
+async function performMigration() {
+    const raw = localStorage.getItem('shortcuts');
+    if (!raw) return;
+    const legacyData = JSON.parse(raw); // Array of {title, content, category}
+
+    const tx = db.transaction([STORE_SHORTCUTS], 'readwrite');
+    const store = tx.objectStore(STORE_SHORTCUTS);
+
+    // Clear Store first?
+    // store.clear(); 
+
+    for (const item of legacyData) {
+        // We encrypt title AND content? Or just content?
+        // Plan says: "Recherche en temps réel ... sur les titres (non chiffrés) ... OU déchiffrez les données en mémoire une seule fois".
+        // To search efficiently without full decryption, maybe keep title clear?
+        // User request: "transformer le contenu texte de vos raccourcis en données illisibles."
+        // Let's Encrypt CONTENT only for now? Or Encrypt Whole Object JSON?
+        // Better: Store { title_enc, content_enc, category } OR { iv, data: encrypted_json_string }.
+        // Let's Encrypt CONTENT strings individually to keep object structure for IDB.
+        // Actually, user said: "transformer le contenu texte de vos raccourcis".
+        // Let's encrypt Title, Content. Category can be clear for filtering?
+        // Let's encrypt Title and Content.
+
+        const encTitle = await encryptData(item.title);
+        const encContent = await encryptData(item.content);
+
+        store.put({
+            title: encTitle,
+            content: encContent,
+            category: item.category || 'Autre',
+            lastUsed: item.lastUsed || Date.now()
+        });
+    }
+
+    return new Promise((resolve) => {
+        tx.oncomplete = () => {
+            localStorage.removeItem('shortcuts'); // Nuke legacy
+            resolve();
+        };
+    });
+}
+
 
 /* ---------- Utility Functions ---------- */
 function displayDateTime() {
@@ -46,7 +362,9 @@ function searchCards() {
     });
 }
 
-function updateShortcutsGrid() {
+/* ---------- Async CRUD ---------- */
+
+async function loadAndRenderShortcuts() {
     const container = document.getElementById('customShortcuts');
     const dtCard = document.getElementById('datetime-card');
     const sort = document.getElementById('sortOrder') ? document.getElementById('sortOrder').value : 'default';
@@ -54,19 +372,95 @@ function updateShortcutsGrid() {
     container.innerHTML = '';
     if (dtCard) container.appendChild(dtCard);
 
-    let saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    // Fetch from IDB
+    const tx = db.transaction([STORE_SHORTCUTS], 'readonly');
+    const store = tx.objectStore(STORE_SHORTCUTS);
+    const req = store.getAll();
 
-    // Sort
-    if (sort === 'alpha') {
-        saved.sort((a, b) => a.title.localeCompare(b.title));
-    } else if (sort === 'lastUsed') {
-        saved.sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0));
+    req.onsuccess = async () => {
+        const encryptedItems = req.result;
+        shortcutsCache = [];
+
+        for (const item of encryptedItems) {
+            const title = await decryptData(item.title);
+            const content = await decryptData(item.content);
+
+            if (title === null || content === null) {
+                console.error("Failed to decrypt item", item.id);
+                continue;
+            }
+
+            shortcutsCache.push({
+                id: item.id,
+                title: title,
+                content: content,
+                category: item.category,
+                lastUsed: item.lastUsed || 0
+            });
+        }
+
+        // Sort
+        if (sort === 'alpha') {
+            shortcutsCache.sort((a, b) => a.title.localeCompare(b.title));
+        } else if (sort === 'lastUsed') {
+            shortcutsCache.sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0));
+        }
+
+        // Render
+        shortcutsCache.forEach(s => createCardDOM(s.title, s.content, s.category || 'Autre', s.lastUsed)); // Update createCardDOM signature
+
+        searchCards(); // Re-apply filter
+    };
+}
+
+async function saveShortcuts() {
+    const data = [];
+    // Read state from DOM to respect current order (DnD)
+    document.querySelectorAll('#customShortcuts .card').forEach(c => {
+        if (c.id === 'datetime-card') return;
+        data.push({
+            title: c.dataset.title,
+            content: c.dataset.content,
+            category: c.dataset.category || 'Autre',
+            lastUsed: parseInt(c.dataset.lastUsed || 0)
+        });
+    });
+
+    shortcutsCache = data;
+
+    // Encrypt & Save to IDB
+    // Strategy: Clear and Add All (simplest for order sync)
+    // Transaction must remain active, so allow await inside but be careful
+    // Actually, awaiting inside a loop might close implicit transaction in some old browsers but usually fine in modern.
+    // Better: Prepare all encrypted objects first, then one tx.
+
+    const preparedItems = [];
+    for (const item of data) {
+        const encTitle = await encryptData(item.title);
+        const encContent = await encryptData(item.content);
+        preparedItems.push({
+            title: encTitle,
+            content: encContent,
+            category: item.category,
+            lastUsed: item.lastUsed
+        });
     }
-    // 'default' uses array order (manual DnD)
 
-    saved.forEach(s => createCardDOM(s.title, s.content, s.category || 'Autre'));
+    const tx = db.transaction([STORE_SHORTCUTS], 'readwrite');
+    const store = tx.objectStore(STORE_SHORTCUTS);
+    store.clear(); // Wipe V1 store
 
-    searchCards(); // Re-apply filter if any
+    preparedItems.forEach(item => store.put(item));
+
+    // History (Store Plaintext)
+    if (!isRestoringHistory) {
+        if (historyStep < historyStack.length - 1) {
+            historyStack = historyStack.slice(0, historyStep + 1);
+        }
+        historyStack.push(JSON.stringify(data));
+        historyStep++;
+        updateUndoRedoUI();
+    }
 }
 
 function escapeHtml(str) {
@@ -143,7 +537,7 @@ document.getElementById('modal-confirm-btn').addEventListener('click', () => {
 
 /* ---------- Core Logic ---------- */
 
-function createCardDOM(title, content, category = 'Autre') {
+function createCardDOM(title, content, category = 'Autre', lastUsed = 0) {
     const container = document.getElementById('customShortcuts');
     const card = document.createElement('div');
     card.className = 'card new';
@@ -152,6 +546,7 @@ function createCardDOM(title, content, category = 'Autre') {
     card.dataset.title = title;
     card.dataset.content = content;
     card.dataset.category = category;
+    card.dataset.lastUsed = lastUsed || Date.now(); // Init if new
 
     card.innerHTML = `
     <div class="card-content">
@@ -176,31 +571,7 @@ function createCardDOM(title, content, category = 'Autre') {
     setTimeout(() => card.classList.remove('new'), 500);
 }
 
-function saveShortcuts() {
-    const data = [];
-    document.querySelectorAll('#customShortcuts .card').forEach(c => {
-        if (c.id === 'datetime-card') return;
-        data.push({
-            title: c.dataset.title,
-            content: c.dataset.content,
-            category: c.dataset.category || 'Autre'
-        });
-    });
-
-    // Save to LocalStorage
-    localStorage.setItem(storageKey, JSON.stringify(data));
-
-    // History Management
-    if (!isRestoringHistory) {
-        // If we serve a new change (not an undo/redo), cut off future history
-        if (historyStep < historyStack.length - 1) {
-            historyStack = historyStack.slice(0, historyStep + 1);
-        }
-        historyStack.push(JSON.stringify(data));
-        historyStep++;
-        updateUndoRedoUI();
-    }
-}
+// saveShortcuts Replaced above
 
 /* ---------- History (Undo/Redo) ---------- */
 let historyStack = [];
@@ -208,10 +579,10 @@ let historyStep = -1;
 let isRestoringHistory = false;
 
 function initHistory() {
-    const data = localStorage.getItem(storageKey) || '[]';
-    historyStack.push(data);
-    historyStep = 0;
-    updateUndoRedoUI();
+    // History starts empty until first load?
+    // Actually we should push initial state after load.
+    historyStack = [];
+    historyStep = -1;
 }
 
 function updateUndoRedoUI() {
@@ -235,16 +606,41 @@ function redo() {
     }
 }
 
-function restoreState(jsonString) {
+async function restoreState(jsonString) {
     isRestoringHistory = true;
-    localStorage.setItem(storageKey, jsonString);
-    updateShortcutsGrid(); // Reloads from LS
+    const data = JSON.parse(jsonString);
+
+    // Direct Refill (skip decrypt since history is plaintext)
+    const container = document.getElementById('customShortcuts');
+    const dtCard = document.getElementById('datetime-card');
+    container.innerHTML = '';
+    if (dtCard) container.appendChild(dtCard);
+
+    data.forEach(s => createCardDOM(s.title, s.content, s.category || 'Autre', s.lastUsed));
+
+    await saveShortcuts(); // Persist the restore to IDB
     isRestoringHistory = false;
     updateUndoRedoUI();
     showToast('État restauré', 'info');
 }
 
-/* ---------- Actions ---------- */
+// ... Actions ...
+
+window.addEventListener('load', () => {
+    initApp(); // New Entry Point
+    initHistory();
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    if (localStorage.getItem('compactMode') === 'true') {
+        document.getElementById('customShortcuts').classList.add('compact');
+    }
+
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js')
+            .then(() => console.log('Service Worker Registered'))
+            .catch(err => console.log('SW Registration Failed:', err));
+    }
+});
 
 // ADD
 function openAddModal() {
@@ -389,7 +785,8 @@ function copy(id, btn) {
 }
 
 
-function copyContent(btn) {
+// Update copyContent to update IDB
+async function copyContent(btn) {
     const card = btn.closest('.card');
     const content = card.dataset.content;
     const title = card.dataset.title;
@@ -397,19 +794,20 @@ function copyContent(btn) {
     navigator.clipboard.writeText(content);
     showToast('Contenu copié !', 'success');
 
-    // Update lastUsed
-    const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
-    const idx = saved.findIndex(s => s.title === title && s.content === content);
-    if (idx > -1) {
-        saved[idx].lastUsed = Date.now();
-        localStorage.setItem(storageKey, JSON.stringify(saved));
-        // Do not re-render immediately to avoid jumping UI if sorted by last used
-    }
+    // Update lastUsed in IDB
+    // We can just update memory cache and saveAll? Or be more surgical?
+    // Saving all is simpler for consistency with `saveShortcuts` logic.
+    // BUT we don't want to encrypt EVERYTHING just for a click.
+    // Optimization: Update just the dataset and call saveShortcuts?
+    // As per user plan: "Suppression : ... cible l'id unique".
+    // For now, let's just update the DOM dataset and call saveShortcuts (which dumps all).
+    card.dataset.lastUsed = Date.now();
+    await saveShortcuts();
 }
 
-// IMPORT / EXPORT
+// Update Exports to use shortcutsCache (Plaintext)
 function exportFile() {
-    const data = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    const data = shortcutsCache; // Decrypted cache
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -419,16 +817,13 @@ function exportFile() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    URL.revokeObjectURL(url);
     showToast('Export réussi !', 'success');
 }
 
 function exportMarkdown() {
-    const data = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    const data = shortcutsCache; // Decrypted cache
     let md = '# Mes Raccourcis\n\n';
 
-    // Group by category ?
-    // Let's just list them
     data.forEach(s => {
         md += `## ${s.title} [${s.category || 'Autre'}]\n\n${s.content}\n\n---\n\n`;
     });

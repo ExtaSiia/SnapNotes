@@ -90,6 +90,11 @@
       </button>
     </div>
 
+    <button id="addBtn" onclick="openAddModal()" class="fab" title="Ajouter un raccourci">
+      <span class="material-symbols-rounded">add</span>
+    </button>
+    </div>
+
     <!-- Import/Export -->
     <div id="exportImport">
       <button onclick="exportFile()" class="btn-secondary" title="Export JSON">Export</button>
@@ -104,6 +109,23 @@
     <footer>
       <p>&copy; <span id="year"></span> - Créé par <a href="https://github.com/ExtaSiia" target="_blank">ExTa</a></p>
     </footer>
+
+    <!-- Security Overlay (Phase 5) -->
+    <div id="security-overlay" class="hidden">
+      <div class="security-modal">
+        <div class="security-icon">
+          <span class="material-symbols-rounded">lock</span>
+        </div>
+        <h2 id="security-title">SnapNotes Sécurisé</h2>
+        <p id="security-message">Entrez votre code secret pour accéder à vos notes.</p>
+
+        <div class="form-group">
+          <input type="password" id="security-input" placeholder="Code secret..." autocomplete="current-password">
+        </div>
+
+        <button id="security-btn" class="btn-primary">Déverrouiller</button>
+      </div>
+    </div>
 
     <script src="app.js"></script>
 </body>
