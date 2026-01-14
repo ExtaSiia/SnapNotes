@@ -10,18 +10,23 @@ SnapNotes est une application web (PWA) de prise de notes ultra-rapide et sécur
     - API `Web Crypto` (SubtleCrypto).
     - Chiffrement **AES-GCM 256-bit** des contenus.
     - Clé dérivée (PBKDF2) depuis un code secret utilisateur + Sel unique.
+    - **Sécurité Avancée (v2.21)** :
+        - Politique de Sécurité de Contenu (**CSP**) stricte (`default-src 'self'`).
+        - Protection contre le **Brute-Force** (Délai exponentiel après 3 échecs).
+        - **Sel Cryptographique Hybride** : Aléatoire pour les nouvelles installations, Legacy pour la compatibilité.
     - La clé de session est stockée en `sessionStorage` (jamais sur disque dur) et exportable.
-- **PWA** : Support hors ligne "Cache-First" avec mise à jour automatique (`skipWaiting`, `clients.claim`).
+- **PWA** : Support hors ligne "Cache-First" avec mise à jour automatique (v2.21).
 
 ## Fonctionnalités Clés
 
 ### 1. Sécurité & Confidentialité (V2)
-- **Chiffrement "Zero Knowledge"** : Les données sont stockées chiffrées. Sans le code secret, elles sont illisibles.
-- **Verrouillage** :
-    - Écran de connexion (Popup flou) au démarrage.
-    - **Session Persistante** : Maintien de l'accès au rechargement de la page.
-    - **Timeout d'inactivité** : Verrouillage automatique après 15 minutes sans interaction.
-- **Migration** : Système automatique pour transformer les anciennes données (`localStorage`) vers le coffre-fort `IndexedDB`.
+- **Chiffrement "Zero Knowledge"** : Les données sont stockées chiffrées en AES-GCM.
+- **Verrouillage Intelligent** :
+    - UI Premium pour la saisie du code (Glassmorphism).
+    - **Session Persistante** : Maintien de l'accès au rechargement.
+    - **Timeout d'inactivité** : Verrouillage automatique à 15mn.
+    - **Anti-Duplication** : Correctifs sur l'édition et l'affichage des cartes (Date/Heure).
+- **Migration** : Système automatique pour transformer les anciennes données.
 
 ### 2. Gestion de Contenu
 - **CRUD Asynchrone** : Ajout, Modification et Suppression interagissant avec la base de données chiffrée.

@@ -4,7 +4,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self';">
   <title>SnapNotes</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
   <link
@@ -90,20 +93,25 @@
       </button>
     </div>
 
-    <button id="addBtn" onclick="openAddModal()" class="fab" title="Ajouter un raccourci">
-      <span class="material-symbols-rounded">add</span>
-    </button>
-    </div>
+
 
     <!-- Import/Export -->
     <div id="exportImport">
-      <button onclick="exportFile()" class="btn-secondary" title="Export JSON">Export</button>
-      <button onclick="exportMarkdown()" class="btn-secondary" title="Export MD">MD</button>
-      <label class="btn-secondary" style="cursor:pointer; display:inline-flex; align-items:center; margin:0;">
-        <span class="material-symbols-rounded" style="font-size:1.1rem; margin-right:4px;">file_upload</span> Import
-        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importFile(this)">
-      </label>
-      <button onclick="toggleCompactMode()" class="btn-secondary" title="Mode Compact">Compact</button>
+      <div class="data-actions">
+        <button onclick="exportFile()" class="action-btn" title="Sauvegarder les données (JSON)">
+          <span class="material-symbols-rounded">save</span>
+          <span>Sauvegarder</span>
+        </button>
+        <button onclick="exportMarkdown()" class="action-btn" title="Exporter en Markdown">
+          <span class="material-symbols-rounded">markdown</span>
+          <span>Markdown</span>
+        </button>
+        <label class="action-btn" style="cursor:pointer;" title="Restaurer une sauvegarde">
+          <span class="material-symbols-rounded">upload_file</span>
+          <span>Restaurer</span>
+          <input type="file" id="importFile" accept=".json" style="display:none" onchange="importFile(this)">
+        </label>
+      </div>
     </div>
 
     <footer>
@@ -127,7 +135,11 @@
       </div>
     </div>
 
-    <script src="app.js"></script>
+    <footer>
+      <p>SnapNotes © 2026 - <a href="https://github.com/ExtaSiia/SnapNotes" target="_blank">ExtaSiia</a></p>
+    </footer>
+
+    <script src="js/app.js" type="module"></script>
 </body>
 
 </html>

@@ -1,6 +1,6 @@
 # ⚡ SnapNotes (Ex-Raccourcis)
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg) ![Version](https://img.shields.io/badge/version-2.0.0-purple.svg) ![Status](https://img.shields.io/badge/status-live-success.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg) ![Version](https://img.shields.io/badge/version-2.21-purple.svg) ![Status](https://img.shields.io/badge/status-live-success.svg)
 
 **SnapNotes** est une application web (PWA) de prise de notes ultra-rapide, sécurisée et "Zero Knowledge". Elle permet de stocker vos snippets, bouts de code et mémos directement dans votre navigateur, chiffrés avec votre mot de passe.
 
@@ -12,6 +12,8 @@
 
 ### 🔒 Sécurité & Confidentialité
 *   **Chiffrement AES-GCM 256-bit** : Vos données sont chiffrées *avant* d'être stockées.
+*   **Protection Brute-Force** : Délai d'attente exponentiel après 3 échecs.
+*   **Politique CSP Stricte** : Blindage contre les scripts malveillants.
 *   **Architecture "Zero Knowledge"** : Nous ne connaissons pas votre mot de passe, et donc nous ne pouvons pas lire vos notes.
 *   **Session Persistante** : Verrouillage automatique après 15 minutes d'inactivité.
 

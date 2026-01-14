@@ -1,10 +1,17 @@
-const CACHE_NAME = 'raccourcis-v2.3';
+const CACHE_NAME = 'raccourcis-v2.21';
 const ASSETS = [
     './index.html',
     './style.css',
-    './app.js',
-    './manifest.json',
-    'https://img.icons8.com/3d-fluency/94/bookmark-ribbon.png'
+    './js/app.js',
+    './js/modules/state.js',
+    './js/modules/utils.js',
+    './js/modules/crypto.js',
+    './js/modules/db.js',
+    './js/modules/ui.js',
+    './assets/logo_clair.png',
+    './assets/logo_sombre.png',
+    './assets/favicon.png',
+    './manifest.json'
 ];
 
 // Install: Cache files & Force activation
