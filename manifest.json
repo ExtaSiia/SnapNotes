@@ -1,0 +1,21 @@
+{
+  "name": "SnapNotes",
+  "short_name": "SnapNotes",
+  "start_url": "./raccourcis.html",
+  "display": "standalone",
+  "background_color": "#1e1e2f",
+  "theme_color": "#6a5acd",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://img.icons8.com/3d-fluency/94/bookmark-ribbon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://img.icons8.com/3d-fluency/512/bookmark-ribbon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
