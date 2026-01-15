@@ -69,6 +69,18 @@ export function initModalListeners() {
     }
 }
 
+export function showSecurityOverlay() {
+    const overlay = document.getElementById('security-overlay');
+    if (overlay) {
+        overlay.classList.remove('hidden');
+        // Ideally focus input
+        setTimeout(() => {
+            const input = document.getElementById('security-input');
+            if (input) input.focus();
+        }, 100);
+    }
+}
+
 export function openAddModal() {
     const modalBody = document.getElementById('modal-body');
     document.getElementById('modal-title').innerText = 'Ajouter un raccourci';

@@ -47,8 +47,11 @@
         <button onclick="redo()" id="redoBtn" class="icon-btn" title="Rétablir (Ctrl+Y)" disabled>
           <span class="material-symbols-rounded">redo</span>
         </button>
-        <button id="themeToggle" onclick="toggleTheme()" title="Changer de thème">
+        <button id="themeToggle" class="icon-btn" onclick="toggleTheme()" title="Changer de thème">
           <span class="material-symbols-rounded">dark_mode</span>
+        </button>
+        <button onclick="logout()" id="logoutBtn" class="icon-btn" title="Se déconnecter">
+          <span class="material-symbols-rounded">logout</span>
         </button>
       </div>
     </div>
@@ -59,31 +62,12 @@
 
     </div>
 
-    <div id="toast-container"></div>
-
-    <div id="modal-overlay" class="hidden">
-      <div class="modal">
-        <div class="modal-header">
-          <h2 id="modal-title">Titre</h2>
-          <button class="close-modal" onclick="closeModal()">
-            <span class="material-symbols-rounded">close</span>
-          </button>
-        </div>
-        <div id="modal-body" class="modal-body"></div>
-        <div class="modal-footer" id="modal-footer">
-          <button onclick="closeModal()" class="btn-secondary">Annuler</button>
-          <button id="modal-confirm-btn" class="btn-primary">Confirmer</button>
-        </div>
-      </div>
-    </div>
-
+    <!-- Overlays moved to body -->
     <div id="fab-container">
       <button id="addBtn" onclick="openAddModal()" class="fab" title="Ajouter un raccourci">
         <span class="material-symbols-rounded">add</span>
       </button>
     </div>
-
-
 
     <!-- Import/Export -->
     <div id="exportImport">
@@ -104,9 +88,28 @@
       </div>
     </div>
 
+    <footer>
+      <p>SnapNotes © 2026 - <a href="https://github.com/ExtaSiia/SnapNotes" target="_blank">ExtaSiia</a></p>
+    </footer>
 
+    <!-- Modals (Middle Layer) -->
+    <div id="modal-overlay" class="hidden">
+      <div class="modal">
+        <div class="modal-header">
+          <h2 id="modal-title">Titre</h2>
+          <button class="close-modal" onclick="closeModal()">
+            <span class="material-symbols-rounded">close</span>
+          </button>
+        </div>
+        <div id="modal-body" class="modal-body"></div>
+        <div class="modal-footer" id="modal-footer">
+          <button onclick="closeModal()" class="btn-secondary">Annuler</button>
+          <button id="modal-confirm-btn" class="btn-primary">Confirmer</button>
+        </div>
+      </div>
+    </div>
 
-    <!-- Security Overlay (Phase 5) -->
+    <!-- Security Overlay (Bottom Layer of Overlays but above content) -->
     <div id="security-overlay" class="hidden">
       <div class="security-modal">
         <div class="security-icon">
@@ -124,9 +127,8 @@
       </div>
     </div>
 
-    <footer>
-      <p>SnapNotes © 2026 - <a href="https://github.com/ExtaSiia/SnapNotes" target="_blank">ExtaSiia</a></p>
-    </footer>
+    <!-- Toasts (MUST be last for proper z-index stacking) -->
+    <div id="toast-container"></div>
 
     <script src="js/app.js" type="module"></script>
 </body>

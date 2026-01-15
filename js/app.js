@@ -53,8 +53,11 @@ function setupSecurity() {
 
     // Unlock Logic
     const handleUnlock = async () => {
-        const password = input.value;
-        if (!password) return;
+        const password = input.value.trim();
+        if (!password) {
+            UI.showToast('Veuillez entrer un mot de passe', 'error');
+            return;
+        }
 
         // Brute Force Protection
         if (failedAttempts > 2) {
@@ -363,3 +366,23 @@ function applyFilters() {
 
     UI.updateShortcutsGrid(list);
 }
+
+// Expose Global Functions for HTML onClick
+window.applyFilters = applyFilters; // Assuming applyFilters is the intended searchCards/updateShortcutsGrid equivalent
+window.copy = Utils.copyToClipboard;
+window.toggleTheme = UI.toggleTheme;
+window.undo = undo; // Using the existing undo function
+window.redo = redo; // Using the existing redo function
+
+// Logout function
+window.logout = () => {
+    sessionStorage.removeItem('snapnotes_key');
+    // Clear DOM for security
+    if (state.shortcutsCache) state.shortcutsCache = [];
+    document.getElementById('customShortcuts').innerHTML = '';
+
+    // Show Lock Screen
+    UI.showSecurityOverlay();
+    document.getElementById('security-input').value = '';
+    UI.showToast('Déconnecté', 'info');
+};
