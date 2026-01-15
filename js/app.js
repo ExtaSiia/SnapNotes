@@ -373,6 +373,8 @@ window.copy = Utils.copyToClipboard;
 window.toggleTheme = UI.toggleTheme;
 window.undo = undo; // Using the existing undo function
 window.redo = redo; // Using the existing redo function
+window.openAddModal = UI.openAddModal; // Add modal
+window.closeModal = UI.closeModal; // Close modal
 
 // Logout function
 window.logout = () => {
